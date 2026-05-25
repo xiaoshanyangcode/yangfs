@@ -1,12 +1,12 @@
 [package]
-name = "dufs"
+name = "yangfs"
 version = "0.46.0"
 edition = "2021"
-authors = ["sigoden <sigoden@gmail.com>"]
+authors = ["xiaoshangyangcode <yeluomen@gmail.com>"]
 description = "Dufs is a distinctive utility file server"
 license = "MIT OR Apache-2.0"
-homepage = "https://github.com/sigoden/dufs"
-repository = "https://github.com/sigoden/dufs"
+homepage = "https://github.com/xiaoshangyangcode/yangfs"
+repository = "https://github.com/xiaoshangyangcode/yangfs"
 categories = ["command-line-utilities", "web-programming::http-server"]
 keywords = ["static", "file", "server", "webdav", "cli"]
 
@@ -54,6 +54,7 @@ pin-project-lite = "0.2"
 sha2 = "0.11.0"
 ed25519-dalek = "2.2.0"
 hex = "0.4.3"
+qrcode = "0.14"
 
 [features]
 default = ["tls"]

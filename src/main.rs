@@ -15,7 +15,7 @@ use crate::server::Server;
 #[cfg(feature = "tls")]
 use crate::utils::{load_certs, load_private_key};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use args::BindAddr;
 use clap_complete::Shell;
 use futures_util::future::join_all;
@@ -47,12 +47,46 @@ async fn main() -> Result<()> {
     }
     let mut args = Args::parse(matches)?;
     logger::init(args.log_file.clone()).map_err(|e| anyhow!("Failed to init logger, {e}"))?;
-    let (new_addrs, print_addrs) = check_addrs(&args)?;
-    args.addrs = new_addrs;
+
+    let ip_a = detect_outgoing_ip()?;
+    let port_b = find_available_port(args.port)?;
+    args.port = port_b;
+    args.addrs = vec![BindAddr::IpAddr("0.0.0.0".parse().unwrap())];
+
     let running = Arc::new(AtomicBool::new(true));
-    let listening = print_listening(&args, &print_addrs)?;
+
+    let protocol = if args.tls_cert.is_some() {
+        "https"
+    } else {
+        "http"
+    };
+    let url = format!("{}://{}:{}{}", protocol, ip_a, port_b, args.uri_prefix);
+
+    // 打印跟路径前提
+    let served_path = args.serve_path.clone();
+
     let handles = serve(args, running.clone())?;
-    println!("{listening}");
+
+    println!(
+        "  🖥️📱  局域网文件互传(LAN FileTransfer)\n\n  1.浏览器(Web):  {}\n  2.浏览器扫码(WebScanCode):",
+        url
+    );
+    print_qr_code(&url);
+    // 打印跟路径
+    let path_to_print = if let Ok(abs_path) = std::fs::canonicalize(&served_path) {
+        let path_str = abs_path.to_string_lossy().into_owned();
+        // 如果是以 \\?\ 开头的 Windows UNC 路径，则截取掉前 4 个字符
+        if path_str.starts_with(r"\\?\") {
+            //path_str[4..].to_string()  优化代码检查，替换为下面这行
+            path_str.strip_prefix(r"\\?\").unwrap().to_string()
+        } else {
+            path_str
+        }
+    } else {
+        served_path.to_string_lossy().into_owned()
+    };
+
+    println!("  🏠 {}", path_to_print);
 
     tokio::select! {
         ret = join_all(handles) => {
@@ -208,95 +242,111 @@ fn create_listener(addr: SocketAddr) -> Result<TcpListener> {
     Ok(listener)
 }
 
-fn check_addrs(args: &Args) -> Result<(Vec<BindAddr>, Vec<BindAddr>)> {
-    let mut new_addrs = vec![];
-    let mut print_addrs = vec![];
-    let (ipv4_addrs, ipv6_addrs) = interface_addrs()?;
-    for bind_addr in args.addrs.iter() {
-        match bind_addr {
-            BindAddr::IpAddr(ip) => match &ip {
-                IpAddr::V4(_) => {
-                    if !ipv4_addrs.is_empty() {
-                        new_addrs.push(bind_addr.clone());
-                        if ip.is_unspecified() {
-                            print_addrs.extend(ipv4_addrs.clone());
-                        } else {
-                            print_addrs.push(bind_addr.clone());
-                        }
-                    }
+fn detect_outgoing_ip() -> Result<IpAddr> {
+    use std::net::UdpSocket;
+    if let Ok(socket) = UdpSocket::bind("0.0.0.0:0") {
+        if let Ok(()) = socket.connect("8.8.8.8:80") {
+            if let Ok(addr) = socket.local_addr() {
+                let ip = addr.ip();
+                if !ip.is_loopback() && !ip.is_unspecified() {
+                    return Ok(ip);
                 }
-                IpAddr::V6(_) => {
-                    if !ipv6_addrs.is_empty() {
-                        new_addrs.push(bind_addr.clone());
-                        if ip.is_unspecified() {
-                            print_addrs.extend(ipv6_addrs.clone());
-                        } else {
-                            print_addrs.push(bind_addr.clone())
-                        }
-                    }
-                }
-            },
-            #[cfg(unix)]
-            _ => {
-                new_addrs.push(bind_addr.clone());
-                print_addrs.push(bind_addr.clone())
             }
         }
     }
-    print_addrs.sort_unstable();
-    Ok((new_addrs, print_addrs))
-}
-
-fn interface_addrs() -> Result<(Vec<BindAddr>, Vec<BindAddr>)> {
-    let (mut ipv4_addrs, mut ipv6_addrs) = (vec![], vec![]);
     let ifaces =
         if_addrs::get_if_addrs().with_context(|| "Failed to get local interface addresses")?;
-    for iface in ifaces.into_iter() {
+    for iface in ifaces {
         let ip = iface.ip();
-        if ip.is_ipv4() {
-            ipv4_addrs.push(BindAddr::IpAddr(ip))
-        }
-        if ip.is_ipv6() {
-            ipv6_addrs.push(BindAddr::IpAddr(ip))
+        if ip.is_ipv4() && !ip.is_loopback() {
+            return Ok(ip);
         }
     }
-    Ok((ipv4_addrs, ipv6_addrs))
+    bail!("No suitable network interface found")
 }
 
-fn print_listening(args: &Args, print_addrs: &[BindAddr]) -> Result<String> {
-    let mut output = String::new();
-    let urls = print_addrs
-        .iter()
-        .map(|bind_addr| match bind_addr {
-            BindAddr::IpAddr(addr) => {
-                let addr = match addr {
-                    IpAddr::V4(_) => format!("{}:{}", addr, args.port),
-                    IpAddr::V6(_) => format!("[{}]:{}", addr, args.port),
-                };
-                let protocol = if args.tls_cert.is_some() {
-                    "https"
-                } else {
-                    "http"
-                };
-                format!("{}://{}{}", protocol, addr, args.uri_prefix)
-            }
-            #[cfg(unix)]
-            BindAddr::SocketPath(path) => path.to_string(),
-        })
-        .collect::<Vec<_>>();
-
-    if urls.len() == 1 {
-        output.push_str(&format!("Listening on {}", urls[0]))
-    } else {
-        let info = urls
-            .iter()
-            .map(|v| format!("  {v}"))
-            .collect::<Vec<String>>()
-            .join("\n");
-        output.push_str(&format!("Listening on:\n{info}\n"))
+fn find_available_port(preferred: u16) -> Result<u16> {
+    if std::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], preferred))).is_ok() {
+        return Ok(preferred);
     }
+    // eprintln!(
+    //     "Port {} is already in use, selecting an available port...",
+    //     preferred
+    // );
+    let listener = std::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], 0)))
+        .with_context(|| "Failed to find an available port")?;
+    Ok(listener.local_addr()?.port())
+}
 
-    Ok(output)
+fn print_qr_code(url: &str) {
+    use qrcode::types::Color;
+    use qrcode::QrCode;
+
+    enable_ansi_support();
+
+    let qr_data = url.to_uppercase();
+    let code = match QrCode::with_error_correction_level(qr_data.as_bytes(), qrcode::EcLevel::L) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to generate QR code: {}", e);
+            return;
+        }
+    };
+
+    let width = code.width();
+    let colors = code.to_colors();
+
+    let quiet = 1usize;
+    let total_w = width + quiet * 2;
+    let total_h = width + quiet * 2;
+
+    let is_dark = |r: usize, c: usize| -> bool {
+        r >= quiet
+            && r < quiet + width
+            && c >= quiet
+            && c < quiet + width
+            && colors[(r - quiet) * width + (c - quiet)] == Color::Dark
+    };
+
+    for row in (0..total_h).step_by(2) {
+        let mut line = String::from("  ");
+        line.push_str("\x1b[107m\x1b[30m");
+
+        for col in 0..total_w {
+            let top_dark = is_dark(row, col);
+            let bottom_dark = if row + 1 < total_h {
+                is_dark(row + 1, col)
+            } else {
+                false
+            };
+
+            let ch = match (top_dark, bottom_dark) {
+                (false, false) => " ",
+                (true, false) => "▀",
+                (false, true) => "▄",
+                (true, true) => "█",
+            };
+            line.push_str(ch);
+        }
+        line.push_str("\x1b[0m");
+        println!("{}", line);
+    }
+}
+
+fn enable_ansi_support() {
+    #[cfg(windows)]
+    unsafe {
+        extern "system" {
+            fn GetStdHandle(nStdHandle: u32) -> isize;
+            fn GetConsoleMode(hConsoleHandle: isize, lpMode: *mut u32) -> i32;
+            fn SetConsoleMode(hConsoleHandle: isize, dwMode: u32) -> i32;
+        }
+        let handle = GetStdHandle((-11i32) as u32);
+        let mut mode: u32 = 0;
+        if GetConsoleMode(handle, &mut mode) != 0 {
+            let _ = SetConsoleMode(handle, mode | 0x0004);
+        }
+    }
 }
 
 async fn shutdown_signal() {

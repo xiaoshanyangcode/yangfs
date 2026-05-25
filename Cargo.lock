@@ -256,6 +256,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
 
 [[package]]
+name = "bytemuck"
+version = "1.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
+
+[[package]]
+name = "byteorder-lite"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
+
+[[package]]
 name = "bytes"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -623,64 +635,6 @@ name = "doc-comment"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "780955b8b195a21ab8e4ac6b60dd1dbdcec1dc6c51c0617964b08c81785e12c9"
-
-[[package]]
-name = "dufs"
-version = "0.46.0"
-dependencies = [
- "alphanumeric-sort",
- "anyhow",
- "assert_cmd",
- "assert_fs",
- "async-stream",
- "async_zip",
- "base64",
- "bytes",
- "chardetng",
- "chrono",
- "clap",
- "clap_complete",
- "content_inspector",
- "digest_auth",
- "ed25519-dalek",
- "form_urlencoded",
- "futures-util",
- "glob",
- "headers",
- "hex",
- "http-body-util",
- "hyper",
- "hyper-util",
- "if-addrs",
- "indexmap",
- "lazy_static",
- "log",
- "md5",
- "mime_guess",
- "percent-encoding",
- "pin-project-lite",
- "port_check",
- "predicates",
- "regex",
- "reqwest",
- "rstest",
- "rustls-pki-types",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha-crypt",
- "sha2 0.11.0",
- "smart-default",
- "socket2",
- "tokio",
- "tokio-rustls",
- "tokio-util",
- "url",
- "urlencoding",
- "uuid",
- "walkdir",
- "xml-rs",
-]
 
 [[package]]
 name = "dunce"
@@ -1306,6 +1260,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "image"
+version = "0.25.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104"
+dependencies = [
+ "bytemuck",
+ "byteorder-lite",
+ "moxcms",
+ "num-traits",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1543,6 +1509,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "moxcms"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b"
+dependencies = [
+ "num-traits",
+ "pxfm",
+]
+
+[[package]]
 name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1715,6 +1691,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "pxfm"
+version = "0.1.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0c5ccf5294c6ccd63a74f1565028353830a9c2f5eb0c682c355c471726a6e3f"
+
+[[package]]
+name = "qrcode"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
+dependencies = [
+ "image",
 ]
 
 [[package]]
@@ -3215,6 +3206,65 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3a56132a0d6ecbe77352edc10232f788fc4ceefefff4cab784a98e0e16b6b51"
 dependencies = [
  "xml",
+]
+
+[[package]]
+name = "yangfs"
+version = "0.46.0"
+dependencies = [
+ "alphanumeric-sort",
+ "anyhow",
+ "assert_cmd",
+ "assert_fs",
+ "async-stream",
+ "async_zip",
+ "base64",
+ "bytes",
+ "chardetng",
+ "chrono",
+ "clap",
+ "clap_complete",
+ "content_inspector",
+ "digest_auth",
+ "ed25519-dalek",
+ "form_urlencoded",
+ "futures-util",
+ "glob",
+ "headers",
+ "hex",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "if-addrs",
+ "indexmap",
+ "lazy_static",
+ "log",
+ "md5",
+ "mime_guess",
+ "percent-encoding",
+ "pin-project-lite",
+ "port_check",
+ "predicates",
+ "qrcode",
+ "regex",
+ "reqwest",
+ "rstest",
+ "rustls-pki-types",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha-crypt",
+ "sha2 0.11.0",
+ "smart-default",
+ "socket2",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "url",
+ "urlencoding",
+ "uuid",
+ "walkdir",
+ "xml-rs",
 ]
 
 [[package]]
